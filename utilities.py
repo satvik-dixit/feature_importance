@@ -539,3 +539,52 @@ def combined_feature_rank(labeled_array, label_list, labeled_speakers_list, feat
     bars = ax.barh(sorted_feature_names, sorted_importance, color=color)
 
   return combined_importance
+
+# ----------------------------------------------------
+
+def shap_features(X, labels, feature_names, test_size=0.3):
+
+  y=[]
+  for label in labels:
+    if label=='NEU':
+      y.append(0)
+    else:
+      y.append(1)
+
+  df = pd.DataFrame(X)
+  df.columns = feature_names
+
+  X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=test_size)
+  svm = SVC(kernel='linear')
+  svm.fit(X_train, y_train)
+
+  X_train_summary = shap.kmeans(X_train, 10)
+  explainer = shap.KernelExplainer(svm.predict, X_train_summary)
+
+  shap_values = explainer.shap_values(X=X_test, n_samples=10)
+  shap.summary_plot(shap_values, X_test, plot_type='bar')
+  
+  
+def lofo_plot(X, labels, feature_names, frac=0.5):
+
+  y=[]
+  for label in labels:
+    if label=='NEU':
+      y.append(0)
+    else:
+      y.append(1)
+
+
+  df = pd.DataFrame(X)
+  df.columns = feature_names
+  df['Results'] = y
+
+  importances = []
+
+  sample_df = df.sample(frac=frac)
+  cv = KFold(n_splits=4, shuffle=False)
+  dataset = Dataset(df=sample_df, target='Results', features=feature_names)
+  lofo_imp = LOFOImportance(dataset, cv=cv, scoring="roc_auc")
+  importance_df = lofo_imp.get_importance()
+
+  plot_importance(importance_df, figsize=(12, 20))
